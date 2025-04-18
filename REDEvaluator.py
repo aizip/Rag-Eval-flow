@@ -361,7 +361,7 @@ class REDEvaluator:
                     self.model_name,
                     torch_dtype=torch.bfloat16,
                     trust_remote_code=True,
-                    attn_implementation="flash_attention_2",  # Change if required
+                    #attn_implementation="flash_attention_2",  # Change if you have it
                     device_map=self.device,
                 )
                 self.model.config.pad_token_id = self.tokenizer.pad_token_id
