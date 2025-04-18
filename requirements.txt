@@ -4,3 +4,4 @@ pandas>=2.2.3
 torch>=2.5.1
 tqdm==4.67.1
 transformers>=4.51.0
+accelerate>=1.6.0
