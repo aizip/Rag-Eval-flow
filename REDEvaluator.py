@@ -22,6 +22,7 @@ class REDEvaluator:
         sample_size: int = 1000,
         random_seed: int = 42,
         batch_size: int = 16,
+        device: str = None,
         openai_api_key: str = None,
         gpt_model: str = "gpt-4o",
         max_new_tokens: int = 512,
@@ -49,7 +50,7 @@ class REDEvaluator:
         self.random_seed = random_seed
         self.batch_size = batch_size
         self.max_new_tokens = max_new_tokens
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_requests_dir = "./batch_requests/"
         self.batch_results_dir = "./batch_results/"
         self.eval_results_dir = "./eval_results/"
