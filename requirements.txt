@@ -1,6 +1,6 @@
 numpy==1.26.4
 openai>=1.60.2
-pandas==2.2.3
-torch==2.5.1
+pandas>=2.2.3
+torch>=2.5.1
 tqdm==4.67.1
 transformers>=4.51.0
