@@ -61,10 +61,10 @@ class REDEvaluator:
         os.makedirs(self.batch_results_dir, exist_ok=True)
         os.makedirs(self.eval_results_dir, exist_ok=True)
         # Set up OpenAI client
+        if not openai_api_key:
+            api_key = os.getenv("OPENAI_API_KEY")
         self.openai_client = OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY")
-            if openai_api_key is None
-            else openai_api_key
+            api_key=api_key
         )
         self.gpt_model = gpt_model
 
