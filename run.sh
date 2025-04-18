@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default values
-DATA_PATH="/home/oliver/query-slm/data/summarizer/ragtest_all_info_0417.jsonl"  # Replace with your actual data path
+DATA_PATH="./data/RED6k-toy.jsonl"  # Replace with your actual data path
 MODEL_NAME="google/gemma-3-1b-it" # Replace with your actual model name
 INPUT_COLUMN="question" 
 DOCUMENT_COLUMN="contexts"
@@ -79,7 +79,7 @@ echo "Metric: $METRIC"
 echo "========================="
 echo ""
 
-python generic_model_eval.py \
+python REDEvaluator.py \
     --data_path "$DATA_PATH" \
     --model_name "$MODEL_NAME" \
     --input_column "$INPUT_COLUMN" \

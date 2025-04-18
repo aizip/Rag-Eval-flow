@@ -33,9 +33,23 @@ The system includes the following evaluation metrics for quick-start:
 
 ## Installation
 
+Install or create an environment with Python 3.11+
+
+- e.g. `conda create -n env_name python=3.11`
+
+- Install from `requirements.txt`
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Usage
 
-### Basic Usage
+### Demo Notebook
+
+- See `demo.ipynb` for details.
+
+### From Shell
 
 ```bash
 ./run.sh --data_path "/path/to/data.jsonl" \
@@ -49,7 +63,7 @@ The system includes the following evaluation metrics for quick-start:
 ### Direct Python Usage
 
 ```bash
-python generic_model_eval.py \
+python REDEvaluator.py \
     --data_path "/path/to/data.jsonl" \
     --model_name "/path/to/model" \
     --input_column "question" \

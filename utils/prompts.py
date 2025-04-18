@@ -49,7 +49,7 @@ def filter_metrics(categories: Optional[List[str]] = None) -> List[str]:
             result.append(metric)
     return result
 
-def format_rag_prompt(self, query: str, context: str, accepts_sys: bool) -> str:
+def format_rag_prompt(query: str, context: str, accepts_sys: bool) -> str:
     system_prompt = """
     You are a helpful assistant that provides answers to queries based on the provided context.
 
