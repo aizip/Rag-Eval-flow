@@ -43,6 +43,8 @@ Install or create an environment with Python 3.11+
 pip install -r requirements.txt
 ```
 
+- **NOTE:** We default to Flash Attention 2 for efficiency reasons. If you are unable to run this package, remove `attn_implementation` argument in line 364 of `REDEvaluator.py` or change it to the implementation you prefer.
+
 ## Usage
 
 ### Demo Notebook
