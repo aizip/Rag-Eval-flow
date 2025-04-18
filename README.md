@@ -1,8 +1,10 @@
 # RED-flow: Pipeline for RAG Evaluation
+![Banner](images/banner.png)
 
 RED-flow is a framework for evaluating Small Language Models (SLMs) on retrieval-augmented generation (RAG) tasks. This system enables batch evaluation of model performance using GPT-4 as a judge on various quality metrics.
 
 ## Overview
+![Flowchart](images/mermaid.png "High-Level Overview")
 
 RED-flow provides an end-to-end pipeline for:
 1. Loading datasets containing queries and contexts
