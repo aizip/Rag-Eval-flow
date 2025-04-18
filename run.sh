@@ -2,7 +2,7 @@
 
 # Default values
 DATA_PATH="./data/RED6k-toy.jsonl"  # Replace with your actual data path
-MODEL_NAME="google/gemma-3-1b-it" # Replace with your actual model name
+MODEL_NAME="your model here" # Replace with your actual model name
 INPUT_COLUMN="question" 
 DOCUMENT_COLUMN="contexts"
 SAMPLE_SIZE=1000

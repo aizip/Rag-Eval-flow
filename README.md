@@ -43,21 +43,22 @@ Install or create an environment with Python 3.11+
 pip install -r requirements.txt
 ```
 
-- **NOTE:** We recommend Flash Attention 2 for efficiency reasons. 
+- **NOTE:** We recommend Flash Attention 2 for efficiency reasons.  
 
 ## Usage
 
 ### Demo Notebook
 
 - See `demo.ipynb` for details.
+- Remember to make a HuggingFace account to run gated models!
 
 ### From Shell
 
 ```bash
 ./run.sh --data_path "/path/to/data.jsonl" \
          --model_name "/path/to/model" \
-         --input_column "question" \
-         --document_column "contexts" \
+         --input_column "your query column" \
+         --document_column "your document column" \
          --sample_size 10 \
          --metric "query relevance"
 ```
@@ -68,13 +69,14 @@ pip install -r requirements.txt
 python REDEvaluator.py \
     --data_path "/path/to/data.jsonl" \
     --model_name "/path/to/model" \
-    --input_column "question" \
-    --document_column "contexts" \
+    --input_column "your query column" \
+    --document_column "your document column" \
     --sample_size 10 \
     --batch_size 8 \
-    --metric "query relevance"
+    --metric "query relevance" 
 ```
-- Check `util/prompts.py` for the keys of included metrics!
+
+- Check `util/prompts.py` for the keys of included metrics!  
 
 ## File Structure
 
