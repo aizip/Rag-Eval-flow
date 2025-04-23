@@ -23,7 +23,7 @@ The system supports caching to avoid redundant model inference.
 
 ## Features
 
-- Support for huggingface or local models
+- Support for Hugging Face or local models
 - Customizable evaluation metrics 
 - Batched evaluation using OpenAI's batch API for cost efficiency
 
@@ -59,7 +59,7 @@ pip install -r requirements.txt
 ### Demo Notebook
 
 - See `demo.ipynb` for details.
-- Remember to make a HuggingFace account to run gated models!
+- Remember to make a Hugging Face account to run gated models!
 
 ### From Shell
 
