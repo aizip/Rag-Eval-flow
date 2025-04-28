@@ -9,7 +9,7 @@ import time
 from typing import List, Dict, Any
 from openai import OpenAI
 from tqdm import tqdm
-from utils.prompts import format_batch_request_task, format_messages, format_rag_prompt
+from utils.prompts import format_batch_request_task, format_messages, format_rag_prompt, metric_needs_gt
 
 
 class REDEvaluator:
@@ -22,11 +22,12 @@ class REDEvaluator:
         sample_size: int = 1000,
         random_seed: int = 42,
         batch_size: int = 16,
-        device: str = None,
         openai_api_key: str = None,
         gpt_model: str = "gpt-4o",
         max_new_tokens: int = 512,
         metric: str = None,
+        gt_column: str = None,
+        device: str = None
     ):
         """
         Initialize the evaluator with model and processing parameters.
@@ -41,21 +42,25 @@ class REDEvaluator:
             openai_api_key: OpenAI API key (default: None, will use env var)
             gpt_model: GPT model to use for evaluation (default: "gpt-4o")
             max_new_tokens: Maximum number of new tokens to generate (default: 128)
+            metric: Single metric to evaluate (e.g., "response coherence")
+            gt_column: Key name in the dataset containing ground truth answers
         """
         self.model_name = model_name
         self.input_column = input_column
         self.document_column = document_column
+        self.gt_column = gt_column
         self.model_type = model_type
         self.sample_size = sample_size
         self.random_seed = random_seed
         self.batch_size = batch_size
         self.max_new_tokens = max_new_tokens
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
-        self.batch_requests_dir = "./batch_requests/"
-        self.batch_results_dir = "./batch_results/"
-        self.eval_results_dir = "./eval_results/"
+        self.batch_requests_dir = "./batch_requests"
+        self.batch_results_dir = "./batch_results"
+        self.eval_results_dir = "./eval_results"
         self.single_metric = metric
         self.openai_api_key = openai_api_key
+        print(self.openai_api_key)
 
         # Make all the necessary directories if they don't exist
         os.makedirs(self.batch_requests_dir, exist_ok=True)
@@ -64,9 +69,8 @@ class REDEvaluator:
         # Set up OpenAI client
         if not self.openai_api_key:
             self.open_api_key = os.getenv("OPENAI_API_KEY")
-        self.openai_client = OpenAI(
-            api_key=self.open_api_key
-        )
+        
+        self.openai_client = OpenAI(api_key=self.openai_api_key)
         self.gpt_model = gpt_model
 
         self.batch_output_fn = os.path.join(
@@ -93,6 +97,7 @@ class REDEvaluator:
                 f"DataFrame has {len(df)} rows, which is less than the requested sample size of {self.sample_size}."
             )
             print("Using the entire DataFrame.")
+            self.sample_size = len(df)
             return df
 
         sampled_df = df.sample(self.sample_size, random_state=self.random_seed)
@@ -168,7 +173,7 @@ class REDEvaluator:
         return generated_texts
 
     def prepare_gpt_evaluation_data(
-        self, original_queries: List[str], contexts: List[str], model_answers: List[str]
+        self, original_queries: List[str], contexts: List[str], model_answers: List[str], gt_answers: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Prepare data for GPT-4 evaluation of answer correctness.
@@ -182,8 +187,10 @@ class REDEvaluator:
         """
         eval_data = []
 
-        for i, (query, context, answer) in enumerate(
-            zip(original_queries, contexts, model_answers)
+        need_answer = metric_needs_gt(self.single_metric)
+
+        for i, (query, context, answer, gt_answer) in enumerate(
+            zip(original_queries, contexts, model_answers, gt_answers)
         ):
             # Create evaluation prompt
             messages = format_messages(
@@ -191,6 +198,7 @@ class REDEvaluator:
                 context=context,
                 response=answer,
                 metric_name=self.single_metric,
+                ground_truth=gt_answer if need_answer else None,
             )
 
             eval_data.append({"id": f"sample_{i}", "messages": messages})
@@ -335,6 +343,24 @@ class REDEvaluator:
             queries = cache_df["queries"].tolist()
             contexts = cache_df["contexts"].tolist()
             model_answers = cache_df["model_answers"].tolist()
+            if "gt_answers" not in cache_df.columns:
+                gt_answers = sampled_df[self.gt_column].tolist()
+                df_indexes = sampled_df.index.tolist()
+                cache_df = pd.DataFrame(
+                {
+                    "queries": queries,
+                    "contexts": contexts,
+                    "model_answers": model_answers,
+                    "gt_answers": gt_answers,
+                    "df_indexes": df_indexes,
+                    "model_name": [self.model_name] * len(queries),
+                    "timestamp": [time.strftime("%Y-%m-%d %H:%M:%S")] * len(queries),
+                }
+                )
+                print(f"Outdated Cache. Saving responses to cache: {cache_filename}")
+                cache_df.to_json(cache_filename, orient="records")
+            else:
+                gt_answers = cache_df["gt_answers"].tolist()
             # Load the original dataframe indexes from cache
             # df_indexes = cache_df['df_indexes'].tolist()
 
@@ -343,6 +369,7 @@ class REDEvaluator:
             # Extract input queries and contexts
             queries = sampled_df[self.input_column].tolist()
             contexts = sampled_df[self.document_column].tolist()
+            gt_answers = sampled_df[self.gt_column].tolist()
             # Save the original indexes for later reference
             df_indexes = sampled_df.index.tolist()
             print(f"Using device: {self.device}")
@@ -362,7 +389,7 @@ class REDEvaluator:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     self.model_name,
                     torch_dtype=torch.bfloat16,
-                    trust_remote_code=True,
+                    trust_remote_code=False,
                     #attn_implementation="flash_attention_2",  # Change if you have it
                     device_map=self.device,
                 )
@@ -388,6 +415,7 @@ class REDEvaluator:
                     "queries": queries,
                     "contexts": contexts,
                     "model_answers": model_answers,
+                    "gt_answers": gt_answers,
                     "df_indexes": df_indexes,
                     "model_name": [self.model_name] * len(queries),
                     "timestamp": [time.strftime("%Y-%m-%d %H:%M:%S")] * len(queries),
@@ -419,7 +447,7 @@ class REDEvaluator:
         print(f"Response data saved to {response_fn}")
 
         # Prepare evaluation data
-        eval_data = self.prepare_gpt_evaluation_data(queries, contexts, model_answers)
+        eval_data = self.prepare_gpt_evaluation_data(queries, contexts, model_answers, gt_answers)
 
         # Send to GPT-4
         evaluation_results = self.send_to_gpt4_batch(eval_data)
@@ -462,6 +490,10 @@ def main():
         description="Evaluate transformer model answers with GPT-4"
     )
     parser.add_argument(
+        "--gt_column",
+        help="Key name in the dataset containing ground truth answers",
+    )
+    parser.add_argument(
         "--metric", help="Single metric to evaluate (e.g., 'response coherence')"
     )
     parser.add_argument(
@@ -497,7 +529,7 @@ def main():
     parser.add_argument(
         "--max_new_tokens",
         type=int,
-        default=2048,
+        default=512,
         help="Maximum new tokens to generate",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -510,7 +542,6 @@ def main():
         "--batch_results_path",
         help="Path to existing batch results file (used with recovery_mode)",
     )
-
     args = parser.parse_args()
 
     evaluator = REDEvaluator(
@@ -525,6 +556,7 @@ def main():
         gpt_model=args.gpt_model,
         max_new_tokens=args.max_new_tokens,
         metric=args.metric,
+        gt_column=args.gt_column,
     )
 
     # Process in recovery mode or normal mode
