@@ -122,6 +122,34 @@ def format_rag_prompt( query: str, context: str, accepts_sys: bool) -> str:
         else [{"role": "user", "content": system_prompt + user_prompt}]
     )
     return messages
+def format_rag_prompt_apple(query: str, context: list[str], accepts_sys: bool) -> list:
+
+    system_prompt = """You answer questions using only the provided context. 
+If the context contains the information needed, provide a direct answer. 
+If the question is nonsensical, metaphorical, or completely unrelated to the context topics, say 'I cannot answer this question' and ask one clarifying question about the query only.
+"""
+    # Context should be list[str] if using ragtest, but list[dict["text"]] if using newer data,
+    if type(context) is list:
+        enumerated_documents = [f'### Document {i + 1}:\n{string}' for i, string in enumerate(context)]
+        documented_context = "\n\n".join(enumerated_documents)
+    else:
+        documented_context = context
+
+    user_prompt = f"""
+Context: 
+{documented_context}
+
+Question: {query}
+"""
+    messages = (
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        if accepts_sys
+        else [{"role": "user", "content": system_prompt + user_prompt}]
+    )
+    return messages
 
 def _format_judge_system_prompt(
     metric_name: str,
