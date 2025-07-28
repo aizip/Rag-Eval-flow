@@ -13,8 +13,9 @@ A flexible, configuration-driven framework for running evaluations on language m
 1.  **Clone the repository:**
 
     ```sh
-    git clone <your-repository-url>
+    git clone https://github.com/aizip/Rag-Eval-flow.git
     cd Rag-Eval-flow
+    git branch refactor
     ```
 
 2.  **Install dependencies:**
