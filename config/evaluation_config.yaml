@@ -78,7 +78,7 @@ evaluation_pipelines:
 
   default_rag_evaluation_test: # feed this to the pipeline_key argument
     data_source_key: "defaultJSONL"
-    data_path: your/eval/dataset/here.jsonl
+    data_path: ./data/RED6k-toy.jsonl
     
     model_key: "huggingface_causal_lm" # Support multiple backends (llama.cpp, vllm, etc)
     model_config_overrides:
