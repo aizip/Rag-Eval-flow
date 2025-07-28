@@ -1,0 +1,63 @@
+# pyproject.toml
+
+# This section defines the build system and is standard boilerplate.
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+# -------------------------------------------------------------------
+
+# This section contains the main metadata for your project.
+[project]
+name = "slm-evaluation-framework"
+version = "0.1.0"
+description = "A recursive-object framework for running model evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License", # Replace if your license differs
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core dependencies required for the project to run.
+dependencies = [
+    "pandas", # Used for data handling and saving results
+    "PyYAML", # Used for loading YAML configuration files
+    "tqdm",
+    # --- ADD OTHER CORE REQUIREMENTS HERE ---
+    # Example: "tqdm",
+]
+
+# -------------------------------------------------------------------
+
+# Optional dependencies for different backends (models, judges).
+# Users can install these with: pip install .[huggingface,openai]
+[project.optional-dependencies]
+huggingface = [
+    "transformers", # For Hugging Face models
+    "torch",        # Required by transformers
+    "accelerate",   # For efficient model loading
+]
+
+openai = [
+    "openai", # For using the OpenAI API as a judge
+]
+
+"llama-cpp" = [
+    "llama-cpp-python", # For running GGUF models with llama.cpp
+]
+
+# --- DEFINE A NEW OPTIONAL DEPENDENCY GROUP HERE ---
+"fa2" = [
+    "torch<2.7.0", # building wheels for 2.7 and above takes forever
+    "flash_attn",
+]
+
+
+# -------------------------------------------------------------------
+
+# After installing with pip, you can run: `evaluate --pipeline_key ...`
+# [project.scripts]
+# evaluate = "src.main:main"
