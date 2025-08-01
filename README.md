@@ -39,7 +39,7 @@ The easiest way to run an evaluation is with the provided script, which uses the
 bash run.sh
 ```
 
-You can customize the run by editing the variables in `config/evaluation_config.yaml` (preferred) or by using the `rag-eval-flow/main.py` arguments directly.
+You can customize the run by editing the variables in `config/evaluation_config.yaml` (preferred) or by using the `rag_eval_flow/main.py` arguments directly.
 
 ## How to Customize the Configuration
 
@@ -67,7 +67,7 @@ This is where you tie everything together. Add a new entry under `evaluation_pip
 evaluation_pipelines:
   # Add your new pipeline here
   mistral_custom_eval:
-    data_source_key: "default_jsonl" # Which data format to use
+    data_source_key: "defaultJSONL" # Which data format to use
     data_path: "/path/to/your/data.jsonl" # Path to your data
     
     model_key: "huggingface_causal_lm" # Which model backend to use

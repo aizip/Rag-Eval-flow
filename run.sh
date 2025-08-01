@@ -17,7 +17,7 @@ CONFIG_PATH="config/evaluation_config.yaml" # please override inside the yaml, n
 # Set the evaluation pipeline key you want to run from the config file.
 PIPELINE_KEY="default_rag_evaluation_test"
 
-CMD="python rag-eval-flow/main.py --config_path $CONFIG_PATH --pipeline_key $PIPELINE_KEY"
+CMD="python rag_eval_flow/main.py --config_path $CONFIG_PATH --pipeline_key $PIPELINE_KEY"
 
 # Print the command that will be executed
 echo "----------------------------------------"
