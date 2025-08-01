@@ -5,27 +5,28 @@ from pathlib import Path # Added import
 from openai import OpenAI
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
-from utils.prompts import format_messages_for_judge, format_batch_request_task, metric_needs_gt, get_metric_definition, get_available_metrics
+from tqdm import tqdm
+from utils.prompts import format_judge_system_prompt, format_judge_user_prompt, METRIC_CONFIG
 
 class BaseJudge(ABC):
     def __init__(self, metric: str, judge_model_name: str, **kwargs):
         self.metric = metric
         self.judge_model_name = judge_model_name
-        if self.metric not in get_available_metrics():
-            raise ValueError(f"Metric '{self.metric}' is not supported. Available: {get_available_metrics()}") # Corrected quoting
-        self.metric_definition = get_metric_definition(self.metric)
-        self.requires_gt = metric_needs_gt(self.metric)
-        print(f"BaseJudge initialized for metric '{self.metric}' using judge model '{self.judge_model_name}'. Requires GT: {self.requires_gt}") # Corrected quoting
-
+        if self.metric not in self.get_available_metrics():
+            raise ValueError(f"Metric '{self.metric}' is not supported. Available: {self.get_available_metrics()}") # Corrected quoting
+        self.metric_requirements = METRIC_CONFIG[self.metric]
 
     @abstractmethod
-    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | str], 
-                                model_answers: List[str], gt_answers: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | List[Dict[str, str]] | str], 
+                                model_answers: List[str], gt_answers: List[str]) -> List[Dict[str, Any]]:
         pass
 
     @abstractmethod
     def evaluate(self, prepared_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         pass
+
+    def get_available_metrics(self):
+        return METRIC_CONFIG.keys()
 
 class OpenAIChatJudge(BaseJudge):
     def __init__(self, judge_model_name: str, metric: str, api_key_env: str = "OPENAI_API_KEY",
@@ -66,48 +67,48 @@ class OpenAIChatJudge(BaseJudge):
 
         self.batch_request_filename = self.batch_requests_dir / f"{base_filename}_batch_request.jsonl"  
         self.batch_output_filename = self.batch_results_dir / f"{base_filename}_batch_output.jsonl"    
-        self.batch_error_filename = self.batch_results_dir / f"{base_filename}_batch_error.jsonl"      
+        self.batch_error_filename = self.batch_results_dir / f"{base_filename}_batch_error.jsonl"
+
+        # attempt to disable HTTP status prints 
+        # TODO fix
+        import logging
+        logging.getLogger("openai").setLevel(logging.WARNING)      
         
-        print(f"OpenAIChatJudge initialized. Batch requests: {self.batch_request_filename}, Batch results: {self.batch_output_filename}") # Path objects will stringify correctly
+        print(f"OpenAIChatJudge initialized. Batch requests: {self.batch_request_filename}, Batch results: {self.batch_output_filename}") 
 
-
-    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | str],
-                                model_answers: List[str], gt_answers: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | List[Dict[str, str]] | str],
+                                model_answers: List[str], gt_answers: List[str]) -> List[Dict[str, Any]]:
         eval_data_for_batch = []
         if not (len(original_queries) == len(contexts) == len(model_answers)):
             raise ValueError("Queries, contexts, and model_answers must have the same length.")
-        if self.requires_gt and (gt_answers is None or len(gt_answers) != len(original_queries)):
-            raise ValueError(f"Metric '{self.metric}' requires ground truth answers, and they must match the length of other inputs.") # Corrected quoting
 
         for i in range(len(original_queries)):
-            current_gt = gt_answers[i] if gt_answers and self.requires_gt else None
-            
-            # Validate if GT is needed but missing (already handled by metric_needs_gt in format_messages_for_judge)
-            # try:
-            messages = format_messages_for_judge(
-                query=original_queries[i],
-                context=contexts[i],
-                response=model_answers[i],
-                metric_name=self.metric,
-                ground_truth=current_gt
-            )
-            # except ValueError as e: # Catch if format_messages_for_judge raises error due to missing GT
-            #     print(f"Skipping sample {i} due to error in formatting messages: {e}")
-            #     continue
+            system_prompt = format_judge_system_prompt(self.metric, self.metric_requirements)
+            data_dict = {
+                "query" : original_queries[i],
+                "context" : contexts[i],
+                "ground_truth" : gt_answers[i]
+            }
+            user_prompt = format_judge_user_prompt(self.metric_requirements, model_answers[i], **data_dict)
 
-            # Each item in eval_data_for_batch will be one request in the batch file
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+
+            # openai API specific construction
             eval_data_for_batch.append({
                 "custom_id": f"sample_{i}_{self.metric.replace(' ', '_')}", # Corrected string replace
                 "messages": messages
             })
         return eval_data_for_batch
 
-    def _send_to_gpt_batch(self, tasks_to_send: List[Dict[str, Any]]) -> str:
+    def _send_to_gpt_batch(self, tasks_to_send: List[Dict[str, Any]]) -> str | None:
         """Internal method to write batch file, send it, and monitor."""
         with open(self.batch_request_filename, "w") as f:
             for task_details in tasks_to_send: # task_details is {"custom_id": ..., "messages": ...}
                 # Format each task for the OpenAI batch API
-                formatted_task = format_batch_request_task(
+                formatted_task = self._format_batch_request_task(
                     custom_id=task_details["custom_id"],
                     messages=task_details["messages"],
                     model=self.judge_model_name,
@@ -116,7 +117,7 @@ class OpenAIChatJudge(BaseJudge):
                     frequency_penalty=self.frequency_penalty,
                     api_endpoint=self.batch_api_endpoint
                 )
-                f.write(json.dumps(formatted_task) + "\n") # Corrected \\n to \n
+                f.write(json.dumps(formatted_task) + "\n") 
         
         print(f"Sending {len(tasks_to_send)} samples to OpenAI Batch API ({self.judge_model_name}) for metric '{self.metric}'. Request file: {self.batch_request_filename}") # Corrected quoting
 
@@ -141,29 +142,121 @@ class OpenAIChatJudge(BaseJudge):
             raise
 
         batch_id = batch_job.id
+        
         print(f"Batch job created with ID: {batch_id}. Waiting for completion...")
 
-        status = batch_job.status
-        while status not in ["completed", "failed", "cancelled"]: 
-            time.sleep(30)  # Poll 
-            batch_job = self.openai_client.batches.retrieve(batch_id=batch_id)
-            if batch_job.status != status:
-                print(f"Batch job {batch_id} status: {batch_job.status}")
-                if batch_job.request_counts:
-                    print(f"Request counts: Total {batch_job.request_counts.total}, Completed {batch_job.request_counts.completed}, Failed {batch_job.request_counts.failed}")
-            status = batch_job.status
+        pbar = None
+        try:
+            # It can take a moment for OpenAI to initialize the job and determine the total request count.
+            # We poll briefly until the total is available before creating the progress bar.
+            while batch_job.request_counts.total == 0:
+                time.sleep(5) 
+                batch_job = self.openai_client.batches.retrieve(batch_id=batch_id)
+
+            # init
+            pbar = tqdm(total=batch_job.request_counts.total, desc=f"Batch {batch_id}", unit="req")
+
+            # Main polling loop to update the progress bar.
+            while batch_job.status not in ["completed", "failed", "cancelled", "expired"]:
+                time.sleep(30)  
+                batch_job = self.openai_client.batches.retrieve(batch_id=batch_id)
+
+                completed_requests = batch_job.request_counts.completed
+                failed_requests = batch_job.request_counts.failed
+                current_progress = completed_requests + failed_requests
+
+                pbar.n = current_progress
+                pbar.set_postfix(
+                    status=batch_job.status,
+                    completed=completed_requests,
+                    failed=failed_requests,
+                    refresh=True  
+                )
+        finally:
+            if pbar:
+                # Perform a final update to make sure the bar shows the final numbers.
+                final_completed = batch_job.request_counts.completed
+                final_failed = batch_job.request_counts.failed
+                pbar.n = final_completed + final_failed
+                pbar.set_postfix(
+                    status=batch_job.status,
+                    completed=final_completed,
+                    failed=final_failed,
+                    refresh=True
+                )
+                pbar.close()
         
-        if status == "completed":
+        if batch_job.status == "completed":
             print(f"Batch job {batch_id} completed.")
             return batch_job.output_file_id
-        elif status == "failed":
+        elif batch_job.status == "failed":
             print(f"Batch job {batch_id} failed. Error file ID: {batch_job.error_file_id}")
             # Optionally, retrieve and log errors from batch_job.errors
             if batch_job.error_file_id:
                 return f"ERROR_FILE:{batch_job.error_file_id}" # Special marker
             raise Exception(f"OpenAI Batch job {batch_id} failed.")
         else: # Cancelled or other unexpected status
-            raise Exception(f"OpenAI Batch job {batch_id} ended with status: {status}.")
+            raise Exception(f"OpenAI Batch job {batch_id} ended with status: {batch_job.status}.")
+        
+    def _format_batch_request_task(self,
+        custom_id: str,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        frequency_penalty: float,
+        api_endpoint: str = "/v1/chat/completions",
+    ) -> Dict:
+        """
+        Format a single task with structured JSON outputs for the OpenAI Batch API.
+
+        Args:
+            custom_id: A unique identifier for this task (e.g., "sample_123").
+            messages: The list of messages for the chat completion.
+            model: The model to use (e.g., "gpt-4o").
+            temperature: Sampling temperature.
+            max_tokens: Maximum number of tokens to generate.
+            frequency_penalty: Frequency penalty.
+            api_endpoint (str): The API endpoint for the request.
+
+        Returns:
+            A dictionary representing the task for the OpenAI Batch API.
+        """
+        return {
+            "custom_id": custom_id,
+            "method": "POST",
+            "url": api_endpoint,
+            "body": {
+                "model": model,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "evaluation",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "explanation": {
+                                    "type": "string",
+                                    "description": "A detailed explanation of the evaluation result.",
+                                },
+                                "score": {
+                                    "type": "number",
+                                    "description": "The score retrieved from the evaluation.",
+                                },
+                            },
+                            "required": ["explanation", "score"],
+                            "additionalProperties": False,
+                        },
+                        "strict": True,
+                    },
+                },
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "frequency_penalty": frequency_penalty,
+                # Add other generation parameters if needed
+            },
+        }
 
 
     def _process_batch_results(self, output_file_id: Optional[str], error_file_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -240,7 +333,7 @@ class OpenAIChatJudge(BaseJudge):
                                 "custom_id": result_item.get("custom_id"),
                                 "explanation": evaluation_json.get("explanation"),
                                 "score": evaluation_json.get("score"),
-                                "raw_judge_response": content_str # Keep the raw judge output
+                                "raw_judge_response": content_str 
                             })
                         except json.JSONDecodeError as je:
                             print(f"Error decoding JSON content from judge for custom_id {result_item.get('custom_id')}: {je}. Content: '{content_str}'") # Corrected quoting
@@ -330,7 +423,7 @@ class DeepSeekChatJudge(BaseJudge):
         super().__init__(metric=metric, judge_model_name=judge_model_name, **kwargs)
         raise NotImplementedError
     
-    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | str], 
+    def prepare_evaluation_data(self, original_queries: List[str], contexts: List[List[str] | List[Dict[str, str]] | str], 
                                 model_answers: List[str], gt_answers: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         raise NotImplementedError
 
