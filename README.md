@@ -39,7 +39,7 @@ The easiest way to run an evaluation is with the provided script, which uses the
 bash run.sh
 ```
 
-You can customize the run by editing the variables in `config/evaluation_config.yaml` (preferred) or by using the `src/main.py` arguments directly.
+You can customize the run by editing the variables in `config/evaluation_config.yaml` (preferred) or by using the `rag-eval-flow/main.py` arguments directly.
 
 ## How to Customize the Configuration
 
