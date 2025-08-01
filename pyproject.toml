@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 # This section contains the main metadata for your project.
 [project]
-name = "slm-evaluation-framework"
+name = "rag-eval-flow"
 version = "0.1.0"
 description = "A recursive-object framework for running model evaluation."
 readme = "README.md"
@@ -26,8 +26,8 @@ dependencies = [
     "pandas", # Used for data handling and saving results
     "PyYAML", # Used for loading YAML configuration files
     "tqdm",
-    # --- ADD OTHER CORE REQUIREMENTS HERE ---
-    # Example: "tqdm",
+    "torch>=2.0.0, <2.7.0"
+
 ]
 
 # -------------------------------------------------------------------
@@ -36,9 +36,8 @@ dependencies = [
 # Users can install these with: pip install .[huggingface,openai]
 [project.optional-dependencies]
 huggingface = [
-    "transformers", # For Hugging Face models
-    "torch",        # Required by transformers
-    "accelerate",   # For efficient model loading
+    "transformers>4.52.0",         
+    "accelerate",   
 ]
 
 openai = [
@@ -49,15 +48,9 @@ openai = [
     "llama-cpp-python", # For running GGUF models with llama.cpp
 ]
 
-# --- DEFINE A NEW OPTIONAL DEPENDENCY GROUP HERE ---
-"fa2" = [
-    "torch<2.7.0", # building wheels for 2.7 and above takes forever
-    "flash_attn",
-]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rag-eval-flow*"]
 
 
-# -------------------------------------------------------------------
 
-# After installing with pip, you can run: `evaluate --pipeline_key ...`
-# [project.scripts]
-# evaluate = "src.main:main"
