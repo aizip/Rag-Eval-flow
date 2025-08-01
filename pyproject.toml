@@ -50,7 +50,7 @@ openai = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["rag-eval-flow*"]
+include = ["rag_eval_flow*"]
 
 
 
