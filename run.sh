@@ -1,11 +1,4 @@
 #!/bin/bash
-#
-# Usage:
-#   ./run_evaluation.sh
-#
-# To make it executable, run:
-#   chmod +x run_evaluation.sh
-#
 
 echo "🚀 Starting evaluation process..."
 
@@ -19,11 +12,9 @@ PIPELINE_KEY="default_rag_evaluation_test"
 
 CMD="python rag_eval_flow/main.py --config_path $CONFIG_PATH --pipeline_key $PIPELINE_KEY"
 
-# Print the command that will be executed
 echo "----------------------------------------"
 echo "Executing Command:"
 echo "$CMD"
 echo "----------------------------------------"
 
-# Execute the command
 eval $CMD
