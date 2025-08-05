@@ -68,5 +68,4 @@ venv.bak/
 cache/
 results/
 data/
-config/
-run.sh
+config/*.local.yaml

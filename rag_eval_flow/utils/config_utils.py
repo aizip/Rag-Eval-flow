@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, Optional
+from pathlib import Path
 
 import yaml
 
@@ -9,7 +10,7 @@ ConfigDict = Dict[str, Any]
 # Configure a basic logger.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def load_config(config_path: str) -> Optional[ConfigDict]:
+def load_config(config_path: str | Path) -> Optional[ConfigDict]:
     """
     Loads and parses a YAML configuration file with robust error handling.
 
@@ -20,12 +21,26 @@ def load_config(config_path: str) -> Optional[ConfigDict]:
         A dictionary representing the YAML content, or None if an error occurs.
     """
     try:
-        with open(config_path, 'r') as f:
+        config_file = Path(config_path)
+        override_path = config_file.with_suffix('.local' + config_file.suffix)
+
+        with open(config_file, 'r') as f:
             config_data = yaml.safe_load(f)
             if not isinstance(config_data, dict):
                 logging.error(f"Configuration file {config_path} must be a dictionary.")
                 return None
-            return config_data
+            
+        # override with .local.yaml for faster experimentation
+        if override_path.exists():
+            with open(override_path, 'r') as f:
+                override_config = yaml.safe_load(f)
+                if not isinstance(config_data, dict):
+                    logging.error(f"Local override at {override_path} invalid, reverting to base")
+                    return config_data
+                print(f"Using {override_path} instead of {config_path}")
+                config_data.update(override_config)
+                
+        return config_data
     except FileNotFoundError:
         logging.error(f"Configuration file not found: {config_path}")
         return None
