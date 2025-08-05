@@ -245,7 +245,7 @@ def main():
         }
         for i in range(len(queries))
     ]
-    pd.DataFrame(final_data).to_json(final_output_path, orient="records", lines=True)
+    pd.DataFrame(final_data).to_json(final_output_path, orient="records", lines=True, force_ascii=False)
     print(f"Evaluation complete. Results saved to {final_output_path}")
 
 

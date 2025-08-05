@@ -748,35 +748,3 @@ def format_batch_request_task(
             # Add other generation parameters if needed
         },
     }
-
-
-# Example of how format_rag_prompt was used in the original script:
-# combined = [
-#     format_rag_prompt(query, context, accepts_sys) # accepts_sys was from tokenizer.chat_template
-#     for query, context in zip(batch_queries, batch_contexts)
-# ]
-# inputs = self.tokenizer.apply_chat_template(
-#     combined, # This would now be a list of lists of dicts
-#     return_tensors="pt",
-#     ...
-# )
-# The new format_rag_prompt returns List[Dict[str,str]] directly,
-# so the model wrapper will need to call apply_chat_template for each item in the batch.
-
-# Example of how format_messages (now format_messages_for_judge) was used:
-# messages = format_messages(
-#     query=query,
-#     context=context,
-#     response=answer,
-#     metric_name=self.single_metric, # This would be self.metric in the judge class
-#     ground_truth=gt_answer if need_answer else None,
-# )
-# eval_data.append({"id": f"sample_{i}", "messages": messages})
-
-# Example of how format_batch_request_task was used:
-# task = format_batch_request_task(
-#     metric_name=self.single_metric, # This is not needed by the new batch formatter
-#     eval_datapoint=datapoint, # datapoint had {"id": ..., "messages": ...}
-#     generation_args=generation_args, # generation_args had model, temp, etc.
-# )
-# The new format_batch_request_task takes these directly.
