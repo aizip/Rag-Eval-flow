@@ -317,6 +317,9 @@ class HuggingFaceModelWrapper(BaseModelWrapper):
             
             # Print first prompt to check for format issues:
             if i == 0:
+                print("====="*10)
+                print("SANITY CHECK: FIRST USER PROMPT:")
+                print("====="*10)
                 print(batch_input_messages[0][-1]["content"])
 
             try: # Tokenize time
