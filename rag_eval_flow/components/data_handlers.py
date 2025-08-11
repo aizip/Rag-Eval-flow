@@ -16,6 +16,7 @@ class BaseDataHandler(ABC):
         sample_size: int = 1000,
         random_seed: int = 42,
         cache_path: str | Path = "./cache",
+        **kwargs,
     ):
         self.data_path = Path(data_path)
         self.input_column = input_column
@@ -36,7 +37,15 @@ class BaseDataHandler(ABC):
         pass
 
     @abstractmethod
-    def save_cache_df(self, model_answers: list[str], model_config: ConfigDict):
+    def save_cache(self, model_answers: list[str], model_config: ConfigDict):
+        pass
+
+    @abstractmethod
+    def assemble_cache_filepath(self, model_config: ConfigDict) -> Path:
+        pass
+
+    @abstractmethod
+    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict):
         pass
 
     def sample_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -65,6 +74,7 @@ class JsonlDataHandler(BaseDataHandler):
         sample_size: int = 1000,
         random_seed: int = 42,
         cache_path: str | Path = "./cache",
+        **kwargs,
     ):
         super().__init__(
             data_path,
@@ -74,6 +84,7 @@ class JsonlDataHandler(BaseDataHandler):
             sample_size,
             random_seed,
             cache_path,
+            **kwargs,
         )
         self.df = self.load_data()
         self.sampled_df = self.sample_dataframe(self.df)
@@ -103,18 +114,10 @@ class JsonlDataHandler(BaseDataHandler):
             print(f"An unexpected error occurred while loading {self.data_path}: {e}")
             raise
 
-    def save_cache_df(self, model_answers: list[str], model_config: ConfigDict):
+    def save_cache(self, model_answers: list[str], model_config: ConfigDict):
         full_response_cache_path = self.assemble_cache_filepath(model_config)
 
-        cache_metadata = {
-            "model_name_used": model_config.get("model_name_or_path"),
-            "lora_adapter_path_used": model_config.get("lora_adapter_path"),
-            "generation_timestamp": strftime("%Y-%m-%d %H:%M:%S"),
-            "sampled_from": str(self.data_path),
-            "random_seed": self.random_seed,
-            "sample_size": self.sample_size,
-            "cache_version": "1.0",
-        }
+        cache_metadata = self._format_metadata(model_config)
 
         cache_data = {
             "metadata": cache_metadata,
@@ -124,6 +127,36 @@ class JsonlDataHandler(BaseDataHandler):
         with open(full_response_cache_path, "w") as f:
             json.dump(cache_data, f, indent=2, ensure_ascii=False)
 
+    def find_and_load_cache(self, model_config: ConfigDict) -> list[str] | None:
+        response_cache_filepath = self.assemble_cache_filepath(model_config)
+
+        if response_cache_filepath.exists():
+            print(f"Loading cached model responses from {response_cache_filepath}")
+            with open(response_cache_filepath) as f:
+                try:
+                    cache = json.load(f)
+                    loaded_metadata = cache.get("metadata", {})
+                    runtime_metadata = self._format_metadata(model_config)
+                    if (
+                        loaded_metadata.get("model_name_used")
+                        == runtime_metadata["model_name_used"]
+                        and loaded_metadata.get("lora_adapter_path_used")
+                        == runtime_metadata["lora_adapter_path_used"]
+                    ):
+                        answer_dicts = cache.get("data", {})
+                        model_answers = [
+                            answer_dict["model_answer"] for answer_dict in answer_dicts
+                        ]
+                        return model_answers
+                    return None
+                except ValueError as ve:
+                    print("Cache formatting failure: ", ve)
+                    return None
+                except Exception as e:
+                    print("Unexpected cache load failure: ", e)
+                    return None
+        return None
+
     def assemble_cache_filepath(self, model_config: ConfigDict) -> Path:
         model_name_sanitized = Path(model_config.get("model_name_or_path")).stem
         lora_path = model_config.get("lora_adapter_path")
@@ -132,6 +165,50 @@ class JsonlDataHandler(BaseDataHandler):
 
         cache_filename = f"{model_name_sanitized}_adapter_{adapter_name_sanitized}_seed{self.random_seed}_n{self.sample_size}_{data_basename}.json"
         return Path(self.cache_path, cache_filename)
+
+    def _format_metadata(self, model_config: ConfigDict) -> dict:
+        cache_metadata = {
+            "model_name_used": model_config.get("model_name_or_path"),
+            "lora_adapter_path_used": model_config.get("lora_adapter_path"),
+            "generation_timestamp": strftime("%Y-%m-%d %H:%M:%S"),
+            "sampled_from": str(self.data_path),
+            "random_seed": self.random_seed,
+            "sample_size": self.sample_size,
+            "cache_version": "1.0",
+        }
+        return cache_metadata
+    
+    def assemble_final_output_filepath(self, run_config: ConfigDict, model_config: ConfigDict) -> Path:
+        base_results_dir = Path(run_config.get("results_dir", "../results"))
+        base_results_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = strftime("%Y%m%d_%H%M%S")
+
+        model_name_sanitized = Path(model_config.get("model_name_or_path")).stem
+        lora_path = model_config.get("lora_adapter_path")
+        adapter_name_sanitized = Path(lora_path).stem if lora_path else "no_adapter"
+        model_output_dirname = f"{model_name_sanitized}_adapter_{adapter_name_sanitized}"
+        output_dir = Path(base_results_dir, model_output_dirname)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        metric_name_sanitized = run_config.get("metric", "unknown_metric").replace(" ", "_")
+        output_fn = f"{metric_name_sanitized}_{timestamp}.json"
+        return Path(output_dir, output_fn)
+    
+    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict):
+        final_metadata = self._format_metadata(model_config)
+        final_output_path = self.assemble_final_output_filepath(run_config, model_config)
+
+        final_data = {
+            "metadata": final_metadata,
+            "data": evaluations,
+        }
+
+        with open(final_output_path, "w") as f:
+            json.dump(final_data, f, indent=2, ensure_ascii=False)
+
+        print(f"Results saved to {final_output_path}")
+
+
 
 
 # TODO more datafile types (parquet, csv, sharegpt, alpaca, maybe support online grabbing from HF?)
