@@ -78,39 +78,3 @@ class ObjectFactory:
             print(f"An unexpected error occurred during instantiation of {class_name}: {e}")
             return None
 
-# Example Usage (conceptual, typically called from main.py)
-if __name__ == '__main__':
-
-    sample_config_for_factory = {
-        "base_config": {
-            "random_seed": 10,
-            "default_setting": "abc"
-        },
-        "data_sources": {
-            "my_data_handler": {
-                "class": "JsonlDataHandler", # Assuming this class exists in components.data_handlers
-                "input_column": "q",
-                "data_path": "/tmp/data.jsonl" # This would typically be overridden
-            }
-        },
-        "models": {
-            "my_model": {
-                "class": "HuggingFaceCausalLM", # Assuming this class exists in components.model_wrappers
-                "model_name_or_path": "test_model",
-                "device": "cpu"
-            }
-        }
-    }
-
-    factory = ObjectFactory(sample_config_for_factory)
-
-    # simulate CLI overrides for data_path
-    data_handler_instance = factory.create("my_data_handler", "data_sources", data_path="/override/path/data.jsonl", sample_size=50)
-    if data_handler_instance:
-        print(f"Created data_handler: {type(data_handler_instance)}")
-        # print(f"Data handler config: {data_handler_instance.__dict__}") # If it stores args
-
-    model_instance = factory.create("my_model", "models", lora_adapter_path="/path/to/lora")
-    if model_instance:
-        print(f"Created model: {type(model_instance)}")
-        # print(f"Model config: {model_instance.__dict__}")

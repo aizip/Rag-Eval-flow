@@ -2,6 +2,9 @@ import argparse
 import os
 import time
 import pandas as pd
+from pathlib import Path
+import json
+
 from factory import ObjectFactory
 from utils.config_utils import load_config, get_config_value, recursive_update
 
@@ -171,43 +174,18 @@ def main():
         else [None] * len(queries)
     )
 
-    # Prepare cache path
-    cache_dir = run_config.get("cache_dir", "../cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    model_name_sanitized = os.path.basename(
-        model_config.get("model_name_or_path", "model")
-    ).replace("/", "_")
-    lora_path = model_config.get("lora_adapter_path")
-    adapter_name_sanitized = (
-        os.path.basename(lora_path).replace("/", "_") if lora_path else "no_adapter"
-    )
-    data_basename = os.path.splitext(os.path.basename(data_handler.data_path))[0]
-    cache_filename = f"{model_name_sanitized}_adapter_{adapter_name_sanitized}_seed{run_config.get('random_seed', 'na')}_n{run_config.get('sample_size', 'na')}_{data_basename}.jsonl"
-    response_cache_path = os.path.join(cache_dir, cache_filename)
-
-    if os.path.exists(response_cache_path):
-        print(f"Loading cached model responses from {response_cache_path}")
-        model_answers = pd.read_json(response_cache_path, lines=True)[
-            "model_answer"
-        ].tolist()
+    # Prepare cache
+    response_cache_path = data_handler.assemble_cache_filepath(model_config)
+    found_answers = data_handler.find_and_load_cache(model_config)
+    
+    if found_answers:
+        model_answers = found_answers
     else:
         print(
             f"Generating answers using model: {model_config.get('model_name_or_path')}"
         )
         model_answers = model_under_test.generate_answers(queries, contexts)
-        pd.DataFrame(
-            {
-                "query": queries,
-                "context": contexts,
-                "model_answer": model_answers,
-                "gt_answer": gt_answers,
-                "model_name_used": model_config.get("model_name_or_path"),
-                "lora_adapter_path_used": model_config.get("lora_adapter_path"),
-                "generation_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "sampled_from": data_handler.data_path,
-            }
-        ).to_json(response_cache_path, orient="records", lines=True)
-        print(f"Saved model responses to cache: {response_cache_path}")
+        data_handler.save_cache(model_answers, model_config)
 
     print("Sending data to judge model for evaluation...")
     evaluations = judge_model.evaluate(
@@ -217,36 +195,8 @@ def main():
     )
 
     # 5. Save Final Results
-    base_results_dir = run_config.get("results_dir", "../results")
-    os.makedirs(base_results_dir, exist_ok=True)
-
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    model_output_dirname = f"{model_name_sanitized}_adapter_{adapter_name_sanitized}"
-    results_dir = os.path.join(base_results_dir, model_output_dirname)
-    os.makedirs(results_dir, exist_ok=True)
-
-    metric_name_sanitized = run_config.get("metric", "unknown_metric").replace(" ", "_")
-    output_filename = f"{metric_name_sanitized}_{timestamp}.jsonl"
-    final_output_path = os.path.join(results_dir, output_filename)
-
-    final_data = [
-        {
-            "query": queries[i],
-            "context": contexts[i],
-            "ground_truth_answer": gt_answers[i],
-            "model_answer": model_answers[i],
-            "evaluation": evaluations[i] if i < len(evaluations) else None,
-            "original_index": sampled_df.index[i]
-            if hasattr(sampled_df, "index")
-            else i,
-            "data_path": data_handler.data_path,
-            "sample_size": run_config.get("sample_size"),
-            "random_seed": run_config.get("random_seed"),
-        }
-        for i in range(len(queries))
-    ]
-    pd.DataFrame(final_data).to_json(final_output_path, orient="records", lines=True, force_ascii=False)
-    print(f"Evaluation complete. Results saved to {final_output_path}")
+    data_handler.save_final_output(evaluations, run_config, model_config)
+    print("Evaluation complete.")
 
 
 if __name__ == "__main__":
