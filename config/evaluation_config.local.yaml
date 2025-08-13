@@ -1,0 +1,124 @@
+# Base configurations that can be inherited or overridden
+base_config:
+  random_seed: 42
+  sample_size: 1000       
+  batch_size: 8          
+  max_new_tokens: 512     
+  results_dir: "./results" # Relative to the root directory, for outputs
+  cache_dir: "./cache"     # Relative to the root directory, for intermediate results like model responses
+
+data_sources:
+  defaultJSONL:
+    class: "JsonlDataHandler"
+    input_column: "question"    
+    document_column: "contexts" 
+    gt_column: "answer"         
+
+
+models:
+  huggingface_causal_lm:
+    class: "HuggingFaceCausalLM"
+    tokenizer_name_or_path: null # If null, defaults to model_name_or_path
+    model_type: "causal_lm"       
+    device: "cuda"                # Options: "auto", "cuda:0", "cpu", etc.
+    model_kwargs:
+      torch_dtype: "bfloat16"     
+      trust_remote_code: false
+      # attn_implementation: "flash_attention_2" # Enable if desired and supported
+    lora_adapter_path: null       # Path to LoRA adapter, can be overridden
+    # max_new_tokens is inherited from base_config or pipeline_config
+
+  # Configuration for HuggingFace Sequence-to-Sequence Models
+  huggingface_seq2seq_lm:
+    class: "HuggingFaceSeq2SeqLM"
+    # model_name_or_path will be provided via CLI or specific run config
+    tokenizer_name_or_path: null # If null, defaults to model_name_or_path
+    model_type: "seq2seq"
+    device: "auto"
+    model_kwargs:
+      torch_dtype: "bfloat16"
+    lora_adapter_path: null
+    # max_new_tokens is inherited from base_config or pipeline_config
+
+  llama-cpp-python_lm:
+    class: ""
+
+judges:
+  # Configuration for OpenAI GPT-based Judge
+  openai_chat_judge:
+    class: "OpenAIChatJudge"
+    # Parameters for OpenAIChatJudge
+    # judge_model_name (e.g. "gpt-4o") will be provided via CLI or specific run config
+    api_key_env: "OPENAI_API_KEY" # Environment variable for API key
+    temperature: 0.3
+    max_tokens: 1024
+    frequency_penalty: 0.5
+    batch_api_endpoint: "/v1/chat/completions"
+    completion_window: "24h"
+    # Directories for batch requests and results will be constructed in the judge class
+    # based on results_dir, model_name, etc.
+    # metric will be provided by the pipeline config
+
+# Defines reusable evaluation pipeline structures
+evaluation_pipelines:
+  default_rag_evaluation:
+    data_source_key: "defaultJSONL"
+    # model_key is the backend, currently only supports transformers
+    # model_key = "huggingface_causal_lm"
+    judge_key: "openai_chat_judge"
+
+    metric: "response coherence" # should correspond to metrics in
+    # sample_size, batch_size, max_new_tokens can also be set here to override base_config
+
+    # output/cache structure for reference
+    # output_filename_template: "{model_name_sanitized}/{metric_sanitized}_{timestamp}.jsonl"
+    # response_cache_filename_template: "{model_name_sanitized}_adapter_{adapter_name_sanitized}_seed{random_seed}_n{sample_size}.json"
+    # batch_request_filename_template: "{model_name_sanitized}_batch_request.jsonl"
+    # batch_output_filename_template: "{model_name_sanitized}_batch_output.jsonl"
+
+  default_rag_evaluation_test: # feed this to the pipeline_key argument
+    data_source_key: "defaultJSONL"
+    data_path: ./data/RED6k-toy.jsonl
+    
+    model_key: "huggingface_causal_lm" # Support multiple backends (llama.cpp, vllm, etc)
+    model_config_overrides:
+      model_name_or_path: "google/gemma-2-2b-it" # Support local or HF models
+
+    judge_key: "openai_chat_judge" # Support multiple judges (openai, deepseek, vercel/gemini)
+    judge_config_overrides:
+      judge_model_name: "gpt-4.1" 
+    
+    metric: "query_relevance"
+    sample_size: 10 
+
+  autobacs_rag:
+    data_source_key: "defaultJSONL"
+    data_path: /nfs/ssd2/projects/jiguo/data_share/autobacs0603_train/jpdoc_geminiflash25_train.jsonl
+    model_key: "huggingface_causal_lm" # Support multiple backends (llama.cpp, vllm, etc)
+    model_config_overrides:
+      model_name_or_path: "google/gemma-2-2b-it" # Support local or HF models
+      lora_adapter_path: /nfs/ssd2/projects/llm_models/autobacs/gmlora_lr5e5_b128_e2_jp20kfact_ABfact_sbodd
+
+    judge_key: "openai_chat_judge" # Support multiple judges (openai, deepseek, vercel/gemini)
+    judge_config_overrides:
+      judge_model_name: "gpt-4.1" 
+    
+    metric: "citation_accuracy"
+    sample_size: 500
+    results_dir: "./results/models/autobacs"
+
+# Example of a specific, named evaluation setup 
+# CLI input: `python main.py --pipeline_key gemma_rag_eval_custom_metric`
+
+#   gemma_rag_eval_custom_metric:
+#     data_path: "/path/to/my_specific_data.jsonl" # Overrides default data path behavior
+#     model_key: "huggingface_causal_lm"      # Specifies which model config to use
+#     model_config_overrides:                 # Overrides for the chosen model_key config
+#       model_name_or_path: "google/gemma-2-2b-it"
+#       lora_adapter_path: "/path/to/gemma_lora_adapter"
+#       max_new_tokens: 1024
+#     judge_key: "openai_chat_judge"          # Specifies which judge config to use
+#     judge_config_overrides:                 # Overrides for the chosen judge_key config
+#       judge_model_name: "gpt-4-turbo"
+#     metric: "custom_eval_metric"            # Overrides the metric from the pipeline
+#     sample_size: 50                         # Overrides sample_size
