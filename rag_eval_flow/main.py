@@ -7,6 +7,7 @@ import json
 
 from factory import ObjectFactory
 from utils.config_utils import load_config, get_config_value, recursive_update
+from utils.data_utils import sample_dataframe
 
 
 def main():
@@ -163,7 +164,7 @@ def main():
     # 4. Run Evaluation Flow
     print("Loading and sampling data...")
     dataframe = data_handler.load_data()
-    sampled_df = data_handler.sample_dataframe(dataframe)
+    sampled_df = sample_dataframe(run_config.get("sample_size"), dataframe, run_config.get("random_seed"))
     queries, contexts = (
         sampled_df[data_handler.input_column].tolist(),
         sampled_df[data_handler.document_column].tolist(),
@@ -195,7 +196,7 @@ def main():
     )
 
     # 5. Save Final Results
-    data_handler.save_final_output(evaluations, run_config, model_config)
+    data_handler.save_final_output(evaluations, run_config, model_config, model_answers)
     print("Evaluation complete.")
 
 

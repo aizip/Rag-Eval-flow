@@ -3,6 +3,7 @@ from time import strftime
 from pathlib import Path
 from abc import ABC, abstractmethod
 from utils.config_utils import ConfigDict
+from utils.data_utils import sample_dataframe
 import json
 
 
@@ -45,23 +46,9 @@ class BaseDataHandler(ABC):
         pass
 
     @abstractmethod
-    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict):
+    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict, model_answers: list):
         pass
 
-    def sample_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        if not isinstance(df, pd.DataFrame):
-            raise ValueError("Input 'df' must be a pandas DataFrame.")
-        if self.sample_size is None or len(df) <= self.sample_size:
-            print(
-                f"DataFrame has {len(df)} rows. Sample size is {self.sample_size}. Using the entire DataFrame or as is."
-            )
-            return df
-
-        sampled_df = df.sample(n=self.sample_size, random_state=self.random_seed)
-        print(
-            f"Sampled {len(sampled_df)} rows from {len(df)} total rows using seed {self.random_seed}."
-        )
-        return sampled_df
 
 
 class JsonlDataHandler(BaseDataHandler):
@@ -87,7 +74,7 @@ class JsonlDataHandler(BaseDataHandler):
             **kwargs,
         )
         self.df = self.load_data()
-        self.sampled_df = self.sample_dataframe(self.df)
+        self.sampled_df = sample_dataframe(self.sample_size, self.df, self.random_seed)
 
     def load_data(self) -> pd.DataFrame:
         try:
@@ -194,13 +181,15 @@ class JsonlDataHandler(BaseDataHandler):
         output_fn = f"{metric_name_sanitized}_{timestamp}.json"
         return Path(output_dir, output_fn)
     
-    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict):
+    def save_final_output(self, evaluations: list[dict], run_config: ConfigDict, model_config: ConfigDict, model_answers: list):
         final_metadata = self._format_metadata(model_config)
+        final_metadata["metric_name"] = run_config.get("metric", "unknown_metric").replace(" ", "_")
         final_output_path = self.assemble_final_output_filepath(run_config, model_config)
 
         final_data = {
             "metadata": final_metadata,
             "data": evaluations,
+            "model_answer": model_answers
         }
 
         with open(final_output_path, "w") as f:
