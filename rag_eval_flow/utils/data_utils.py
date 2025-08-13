@@ -125,6 +125,7 @@ def construct_one_model_metrics_df(filepath_list: list[Path]) -> tuple[pd.DataFr
         with open (data_extraction_example) as f:
             example = json.load(f)
             metadata = example.get("metadata", {})
+            model_answers = pd.Series(example.get("model_answer", []), name="model_answer" )
 
         data_path = Path(metadata["sampled_from"])
         random_seed = metadata["random_seed"]
@@ -136,10 +137,11 @@ def construct_one_model_metrics_df(filepath_list: list[Path]) -> tuple[pd.DataFr
         data_path = Path(row["data_path"])
         random_seed = row["random_seed"]
         sample_size = row["sample_size"]
+        model_answers = df["model_answer"]
     
     sampled_data_df = sample_dataframe(sample_size, pd.read_json(data_path, lines=True), random_seed)
     sampled_metadata_df = pd.json_normalize(sampled_data_df["metadata"])
-    final_data_df = pd.concat([sampled_data_df, sampled_metadata_df], axis=1)
+    final_data_df = pd.concat([sampled_data_df, sampled_metadata_df, model_answers], axis=1)
     individual_metric_dfs.append(final_data_df)
 
     for file_path in filepath_list:
