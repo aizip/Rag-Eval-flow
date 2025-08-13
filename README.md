@@ -15,7 +15,7 @@ A flexible, configuration-driven framework for running evaluations on language m
     ```sh
     git clone https://github.com/aizip/Rag-Eval-flow.git
     cd Rag-Eval-flow
-    git branch refactor
+    git checkout refactor
     ```
 
 2.  **Install dependencies:**
@@ -23,10 +23,10 @@ A flexible, configuration-driven framework for running evaluations on language m
 
     ```sh
     # Install with Hugging Face and OpenAI support
-    pip install .[huggingface,openai]
+    pip install -e .[huggingface,openai]
 
     # Install with llama-cpp-python support
-    pip install .[llama-cpp]
+    pip install -e .[llama-cpp]
     ```
 
 -----
