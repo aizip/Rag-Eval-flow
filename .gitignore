@@ -69,3 +69,4 @@ cache/
 results/
 data/
 config/*.local.yaml
+visualizations/
