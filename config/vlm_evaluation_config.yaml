@@ -1,0 +1,77 @@
+# Base configurations that can be inherited or overridden
+base_config:
+  random_seed: 42
+  sample_size: 1000       
+  batch_size: 1         
+  max_new_tokens: 512     
+  results_dir: "./results" # Relative to the root directory, for outputs
+  cache_dir: "./cache"     # Relative to the root directory, for intermediate results like model responses
+
+data_sources:
+  defaultJSONL:
+    class: "JsonlDataHandler"
+    input_column: "question"    
+    document_column: "images" 
+    gt_column: "answer"         
+
+models:
+  minicpm:
+    class: "HuggingFaceCausalLM"
+    tokenizer_name_or_path: null # If null, defaults to model_name_or_path
+    model_type: "causal_lm"       
+    device: "cuda"                # Options: "auto", "cuda:0", "cpu", etc.
+    model_kwargs:
+      torch_dtype: "bfloat16"     
+      trust_remote_code: true
+      # attn_implementation: "flash_attention_2" # Enable if desired and supported
+    lora_adapter_path: null       # Path to LoRA adapter, can be overridden
+    # max_new_tokens is inherited from base_config or pipeline_config
+
+judges:
+  # Configuration for OpenAI GPT-based Judge
+  openai_chat_judge:
+    class: "OpenAIChatJudge"
+    # Parameters for OpenAIChatJudge
+    # judge_model_name (e.g. "gpt-4o") will be provided via CLI or specific run config
+    api_key_env: "OPENAI_API_KEY" # Environment variable for API key
+    temperature: 0.3
+    max_tokens: 512
+    frequency_penalty: 0.5
+    batch_api_endpoint: "/v1/chat/completions"
+    completion_window: "24h"
+    # Directories for batch requests and results will be constructed in the judge class
+    # based on results_dir, model_name, etc.
+    # metric will be provided by the pipeline config
+
+# Defines reusable evaluation pipeline structures
+evaluation_pipelines:
+  default_rag_evaluation:
+    data_source_key: "defaultJSONL"
+    # model_key is the backend, currently only supports transformers
+    # model_key = "huggingface_causal_lm"
+    judge_key: "openai_chat_judge"
+
+    metric: "response coherence" # should correspond to metrics in
+    batch_size: 4
+    # sample_size, batch_size, max_new_tokens can also be set here to override base_config
+
+    # output/cache structure for reference
+    # output_filename_template: "{model_name_sanitized}/{metric_sanitized}_{timestamp}.jsonl"
+    # response_cache_filename_template: "{model_name_sanitized}_adapter_{adapter_name_sanitized}_seed{random_seed}_n{sample_size}.json"
+    # batch_request_filename_template: "{model_name_sanitized}_batch_request.jsonl"
+    # batch_output_filename_template: "{model_name_sanitized}_batch_output.jsonl"
+
+  default_rag_evaluation_test: # feed this to the pipeline_key argument
+    data_source_key: "defaultJSONL"
+    data_path: ./data/arxiv.jsonl
+    
+    model_key: "minicpm" # Support multiple backends (llama.cpp, vllm, etc)
+    model_config_overrides:
+      model_name_or_path: "openbmb/MiniCPM-V-2_6" # Support local or HF models
+
+    judge_key: "openai_chat_judge" # Support multiple judges (openai, deepseek, vercel/gemini)
+    judge_config_overrides:
+      judge_model_name: "gpt-4.1" 
+    
+    metric: "correctness"
+    sample_size: 498
