@@ -5,7 +5,7 @@ echo "🚀 Starting evaluation process..."
 # --- CONFIGURATION ---
 # Paths are relative to this script's location (the project root)
 
-CONFIG_PATH="config/evaluation_config.yaml" # please override inside the yaml, not here.
+CONFIG_PATH="config/vlm_evaluation_config.yaml" # please override inside the yaml, not here.
 
 # Set the evaluation pipeline key you want to run from the config file.
 PIPELINE_KEY="default_rag_evaluation_test"
