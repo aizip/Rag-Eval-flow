@@ -137,10 +137,9 @@ def main():
             "batch_size": run_config.get("batch_size"),
         },
     )
-    model_under_test = factory.create(model_key, "models", **model_config)
-    if not model_under_test:
-        return
 
+
+    
     # Judge Model
     judge_key = run_config.get("judge_key")
     judge_config = config.get("judges", {}).get(judge_key, {}).copy()
@@ -182,6 +181,9 @@ def main():
     if found_answers:
         model_answers = found_answers
     else:
+        model_under_test = factory.create(model_key, "models", **model_config)
+        if not model_under_test:
+            return
         print(
             f"Generating answers using model: {model_config.get('model_name_or_path')}"
         )
