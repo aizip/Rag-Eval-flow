@@ -9,6 +9,9 @@ class MetricRequirements:
     ground_truth_required: bool
     sys_definition: str 
 
+# @dataclass(frozen=True)
+# class Prompt
+
 METRIC_CONFIG = {
     "query_relevance": MetricRequirements(
         query_required=True,
@@ -530,12 +533,12 @@ def format_rag_prompt(
     Returns:
         List[Dict[str, str]]: A list of message dictionaries for the model.
     """
-    system_message_content = """
-You are a helpful assistant that provides answers to queries based on the provided context.
-You MUST clearly refuse to answer the query and ask for additional information from the user if the answer cannot be found in the context.
-The output should not contain your judgment on answerability, only your answer OR your refusal + clarifications.
-Stay within the bounds of the provided context and avoid making assumptions.
-"""
+    system_message_content = ""
+# You are a helpful assistant that provides answers to queries based on the provided context.
+# You MUST clearly refuse to answer the query and ask for additional information from the user if the answer cannot be found in the context.
+# The output should not contain your judgment on answerability, only your answer OR your refusal + clarifications.
+# Stay within the bounds of the provided context and avoid making assumptions.
+# """
     if isinstance(context, list):
         documented_context = "\n\n".join(
             [f"Document {i + 1}: {doc['text']}" if isinstance(doc, dict) else f"Document {i + 1}: {doc}" for i, doc in enumerate(context)]
@@ -579,6 +582,76 @@ Please output your either your grounded answer, OR refusal and clarifications. (
 
     return messages
 
+def format_rag_prompt_JP(
+    query: str,
+    context: list | str,
+    tokenizer_chat_template: Optional[str] = None,
+    model_accepts_system_prompt: bool = True,
+) -> List[Dict[str, str]]:
+    """
+    Formats a RAG prompt for a HuggingFace model, attempting to use its chat template.
+
+    Args:
+        query (str): The user's query.
+        context (list | str): The context documents.
+        tokenizer_chat_template (Optional[str]): The chat template string from the tokenizer.
+                                                 If None, a generic template is used.
+        model_accepts_system_prompt (bool): Whether the model's template supports a system role.
+                                            This is often determined by checking if "System role not supported"
+                                            is in the tokenizer.chat_template.
+
+    Returns:
+        List[Dict[str, str]]: A list of message dictionaries for the model.
+    """
+    system_message_content = ""
+# You are a helpful assistant that provides answers to queries based on the provided context.
+# You MUST clearly refuse to answer the query and ask for additional information from the user if the answer cannot be found in the context.
+# The output should not contain your judgment on answerability, only your answer OR your refusal + clarifications.
+# Stay within the bounds of the provided context and avoid making assumptions.
+# """
+    if isinstance(context, list):
+        documented_context = "\n\n".join(
+            [f"Document {i + 1}: {doc['text']}" if isinstance(doc, dict) else f"Document {i + 1}: {doc}" for i, doc in enumerate(context)]
+        )
+    else:
+        documented_context = str(context)
+
+    user_message_content = f"""# 役割と課題の説明
+提供された文書のみから、以下の質問に回答可能かどうかを判断してください。
+回答可能な場合は、質問に対する完全かつ根拠のある回答を提供し、判断過程には触れないでください。
+質問のすべてに対応するよう努め、回答できない部分がある場合は、十分な情報がないことを明確に述べてください。
+
+それ以外の場合は、回答を明確に拒否し、あるいは必要な追加情報をユーザーに求めてください。
+文書に基づいて質問に回答できない理由を簡潔に説明し、ユーザーからより関連性の高い情報を求めてください。
+
+# 指示
+以下の質問とコンテキストを基に、回答を提供してください：
+
+## 質問
+{query}
+
+## コンテキスト
+
+{documented_context}
+
+# 課題
+根拠のある回答、回答拒否または追加説明のいずれかを出力してください（回答可能性に関する判断は含めないでください）：
+"""
+
+    if model_accepts_system_prompt:
+        messages = [
+            {"role": "system", "content": system_message_content},
+            {"role": "user", "content": user_message_content},
+        ]
+    else:  # Combine into user prompt if system role is not supported
+        messages = [
+            {
+                "role": "user",
+                "content": f"{user_message_content}",
+            }
+        ]
+
+    return messages
 # These format functions return only the raw strings
 # It's up to the judge classes to handle data-structure formatting
 def format_judge_system_prompt(
