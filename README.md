@@ -2,10 +2,9 @@
 
 A flexible, configuration-driven framework for running evaluations on language models.
 
-> **🚧 Active Development on `refactor` Branch 🚧**
+> **🚧 Active Development on `development` Branch 🚧**
 >
-> This branch contains a significant refactoring of the framework. It is unstable and subject to breaking changes. For a stable version, please use the `development` branch.
-
+> This branch contains a significant refactoring of the framework. It is unstable and subject to breaking changes. 
 -----
 
 ## Installation
