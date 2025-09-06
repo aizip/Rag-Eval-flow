@@ -1,114 +1,96 @@
-<p align="left">
-  <img src="images/banner_small.jpg" alt="Project Logo">
-</p>
+# Rag-Eval-flow 
 
-# RED-flow: Pipeline for RAG Evaluation
+A flexible, configuration-driven framework for running evaluations on language models.
 
+> **🚧 Active Development on `refactor` Branch 🚧**
+>
+> This branch contains a significant refactoring of the framework. It is unstable and subject to breaking changes. For a stable version, please use the `development` branch.
 
-
-RED-flow is a framework for evaluating Small Language Models (SLMs) on retrieval-augmented generation (RAG) tasks. This system enables batch evaluation of model performance using GPT-4 as a judge on various quality metrics.
-
-## Overview
-<p align="center">
-  <img src="images/mermaid.png" width="200" alt="Project Logo">
-</p>
-
-RED-flow provides an end-to-end pipeline for:
-1. Loading datasets containing queries and contexts
-2. Running inference with target models locally
-3. Evaluating responses using GPT-4o on customizable metrics
-4. Processing and storing results
-
-The system supports caching to avoid redundant model inference.
-
-## Features
-
-- Support for huggingface or local models
-- Customizable evaluation metrics 
-- Batched evaluation using OpenAI's batch API for cost efficiency
-
-## Metrics
-
-The system includes the following evaluation metrics for quick-start:
-
-- **Query Relevance**: Measures how relevant the response is to the query
-- **Query Completeness**: Assesses how thoroughly the response answers the query
-- **Context Adherence**: Evaluates how much the response is based on the provided context
-- **Context Completeness**: Measures how much of the relevant context is used
-- **Response Coherence**: Rates the overall readability and coherence
-- **Response Length**: Evaluates appropriateness of the response length
-- **Refusal Quality**: Scores how well a model explains a refusal to answer
-- **Refusal Clarification Quality**: Evaluates any clarification questions asked during refusal
+-----
 
 ## Installation
 
-Install or create an environment with Python 3.11+
+1.  **Clone the repository:**
 
-- e.g. `conda create -n env_name python=3.11`
+    ```sh
+    git clone https://github.com/aizip/Rag-Eval-flow.git
+    cd Rag-Eval-flow
+    git checkout refactor
+    ```
 
-- Install from `requirements.txt`
+2.  **Install dependencies:**
+    Install the base package along with the optional backends you need.
 
-```bash
-pip install -r requirements.txt
+    ```sh
+    # Install with Hugging Face and OpenAI support
+    pip install -e .[huggingface,openai]
+
+    # Install with llama-cpp-python support
+    pip install -e .[llama-cpp]
+    ```
+
+-----
+
+## Quickstart
+
+The easiest way to run an evaluation is with the provided script, which uses the `default_rag_evaluation_test` pipeline from the config file.
+
+```sh
+bash run.sh
 ```
 
-- **NOTE:** We recommend Flash Attention 2 for efficiency reasons.  
+You can customize the run by editing the variables in `config/evaluation_config.yaml` (preferred) or by using the `rag_eval_flow/main.py` arguments directly.
 
-## Usage
+## How to Customize the Configuration
 
-### Demo Notebook
+All evaluation logic is controlled by `config/evaluation_config.yaml`. You can add your own data, models, and evaluation pipelines directly to this file.
 
-- See `demo.ipynb` for details.
-- Remember to make a HuggingFace account to run gated models!
+#### 1\. Define Your Model
 
-### From Shell
+Add a new entry under the `models` section. You can copy an existing configuration like `huggingface_causal_lm` and change the details.
 
-```bash
-./run.sh --data_path "/path/to/data.jsonl" \
-         --model_name "/path/to/model" \
-         --input_column "your query column" \
-         --document_column "your document column" \
-         --sample_size 10 \
-         --metric "query relevance"
+#### 2\. Define Your Judge
+
+Similarly, you can define a new judge or a new configuration for an existing one under the `judges` section.
+
+#### 3\. Create a New Evaluation Pipeline
+
+This is where you tie everything together. Add a new entry under `evaluation_pipelines`. This new pipeline key is what you will pass to the run script.
+
+**Example:** Adding a new pipeline to test `Mistral-7B` on a custom metric.
+
+```yaml
+# In config/evaluation_config.yaml
+
+# ... existing models and judges sections ...
+
+evaluation_pipelines:
+  # Add your new pipeline here
+  mistral_custom_eval:
+    data_source_key: "defaultJSONL" # Which data format to use
+    data_path: "/path/to/your/data.jsonl" # Path to your data
+    
+    model_key: "huggingface_causal_lm" # Which model backend to use
+    model_config_overrides:
+      model_name_or_path: "mistralai/Mistral-7B-Instruct-v0.2" # The specific model make sure you have any API keys you need in your environment!
+
+    judge_key: "openai_chat_judge" # Which judge to use
+    judge_config_overrides:
+      judge_model_name: "gpt-4o" 
+    
+    metric: "your_custom_metric_name" # The metric to be evaluated
+    sample_size: 200 # Number of samples to run
 ```
 
-### Direct Python Usage
 
-```bash
-python REDEvaluator.py \
-    --data_path "/path/to/data.jsonl" \
-    --model_name "/path/to/model" \
-    --input_column "your query column" \
-    --document_column "your document column" \
-    --sample_size 10 \
-    --batch_size 8 \
-    --metric "query relevance" 
+To run the custom pipeline you just created, edit the `PIPELINE_KEY` in `run.sh` and execute it.
+
+```sh
+# In run.sh
+PIPELINE_KEY="mistral_custom_eval"
 ```
 
-- Check `util/prompts.py` for the keys of included metrics!  
-
-## File Structure
-
-- `generic_model_eval.py`: Main evaluation framework
-- `utils/prompts.py`: Prompt templates and metric definitions
-- `run.sh`: Convenience shell script for running evaluations
-
-## Output Directories
-
-- `./batch_requests/`: Stores batch evaluation requests
-- `./batch_results/`: Stores model outputs and batch results
-- `./eval_results/`: Contains final evaluation results
-
-## Requirements
-
-- OpenAI API access
-- Python 3.11+
-- Required packages: transformers, torch, pandas, tqdm, openai
-
-## Environment Variables
-
-- `OPENAI_API_KEY`: Your OpenAI API key (can also be passed as a parameter)
-
-## Contributing
-
-Contributions to RED-flow are welcome! Feel free to submit pull requests or open issues for bugs, feature requests, or documentation improvements.
+```sh
+# Then run from your terminal
+bash run.sh
+```

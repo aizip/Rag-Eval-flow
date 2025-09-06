@@ -65,6 +65,8 @@ venv.bak/
 *.swo
 
 # Project specific
-batch_requests/
-batch_results/
-eval_results/
+cache/
+results/
+data/
+config/*.local.yaml
+visualizations/

@@ -51,7 +51,7 @@ judges:
     # judge_model_name (e.g. "gpt-4o") will be provided via CLI or specific run config
     api_key_env: "OPENAI_API_KEY" # Environment variable for API key
     temperature: 0.3
-    max_tokens: 1024
+    max_tokens: 512
     frequency_penalty: 0.5
     batch_api_endpoint: "/v1/chat/completions"
     completion_window: "24h"
@@ -89,23 +89,9 @@ evaluation_pipelines:
       judge_model_name: "gpt-4.1" 
     
     metric: "query_relevance"
-    sample_size: 10 
+    sample_size: 10
 
-  autobacs_rag:
-    data_source_key: "defaultJSONL"
-    data_path: /nfs/ssd2/projects/jiguo/data_share/autobacs0603_train/jpdoc_geminiflash25_train.jsonl
-    model_key: "huggingface_causal_lm" # Support multiple backends (llama.cpp, vllm, etc)
-    model_config_overrides:
-      model_name_or_path: "google/gemma-2-2b-it" # Support local or HF models
-      lora_adapter_path: /nfs/ssd2/projects/llm_models/autobacs/gmlora_lr5e5_b128_e2_jp20kfact_ABfact_sbodd
 
-    judge_key: "openai_chat_judge" # Support multiple judges (openai, deepseek, vercel/gemini)
-    judge_config_overrides:
-      judge_model_name: "gpt-4.1" 
-    
-    metric: "citation_accuracy"
-    sample_size: 500
-    results_dir: "./results/models/autobacs"
 
 # Example of a specific, named evaluation setup 
 # CLI input: `python main.py --pipeline_key gemma_rag_eval_custom_metric`
