@@ -2,7 +2,6 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM
 from tqdm import tqdm
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
 from utils.prompts import format_rag_prompt 
 
 # THIS ONLY WORKS FOR HF MODELS RN, TODO: FIX
@@ -45,7 +44,7 @@ def is_system_prompt_supported(tokenizer: AutoTokenizer) -> bool:
 
 class BaseModelWrapper(ABC):
     def __init__(self, model_name_or_path: str, model_type: str, max_new_tokens: int = 512, 
-                 batch_size: int = 16, device: str = "auto", model_kwargs: Optional[Dict] = None, **kwargs):
+                 batch_size: int = 16, device: str = "auto", model_kwargs: dict | None = None, **kwargs):
         self.model_name_or_path = model_name_or_path
         self.model_type = model_type
         self.max_new_tokens = max_new_tokens
@@ -66,14 +65,14 @@ class BaseModelWrapper(ABC):
         pass
 
     @abstractmethod
-    def generate_answers(self, query_texts: List[str], documents: List[List[str] | str]) -> List[str]:
+    def generate_answers(self, query_texts: list[str], documents: list[list[str] | str]) -> list[str]:
         pass
 
 # TODO: support more backends (llama.cpp, vllm, bitnet.cpp, etc.)
 class LlamaCppModelWrapper(BaseModelWrapper):
     def __init__(self, model_name_or_path: str, model_type: str, 
-                 tokenizer_name_or_path: Optional[str] = None, 
-                 lora_adapter_path: Optional[str] = None, **kwargs):
+                 tokenizer_name_or_path: str | None = None, 
+                 lora_adapter_path: str | None = None, **kwargs):
         try:
             # Import llama_cpp and its chat handler for prompt formatting.
             import llama_cpp
@@ -91,7 +90,7 @@ class LlamaCppModelWrapper(BaseModelWrapper):
             print("Warning: LlamaCpp backend selected without LoRA adapter gguf. Make sure lora_adapter_path is set correctly.")
         
         # The model object, will be initialized in load_model_and_tokenizer.
-        self.model: Optional[llama_cpp.Llama] = None
+        self.model: llama_cpp.Llama | None = None
         # most modern chat-finetuned GGUF models support system prompts.
         # TODO add check
         self._model_accepts_system_prompt = True 
@@ -147,7 +146,7 @@ class LlamaCppModelWrapper(BaseModelWrapper):
             raise
 
 
-    def generate_answers(self, query_texts: List[str], documents: List[List[str] | str]) -> List[str]:
+    def generate_answers(self, query_texts: list[str], documents: list[list[str] | str]) -> list[str]:
         """
         Generates answers for a batch of queries using the model's batched inference capability.
         """
@@ -208,8 +207,8 @@ class LlamaCppModelWrapper(BaseModelWrapper):
 
 class HuggingFaceModelWrapper(BaseModelWrapper):
     def __init__(self, model_name_or_path: str, model_type: str, 
-                 tokenizer_name_or_path: Optional[str] = None, 
-                 lora_adapter_path: Optional[str] = None, **kwargs):
+                 tokenizer_name_or_path: str | None = None, 
+                 lora_adapter_path: str | None = None, **kwargs):
         super().__init__(model_name_or_path, model_type, **kwargs)
         self.tokenizer_name_or_path = tokenizer_name_or_path if tokenizer_name_or_path else model_name_or_path
         self.lora_adapter_path = lora_adapter_path
@@ -291,7 +290,7 @@ class HuggingFaceModelWrapper(BaseModelWrapper):
                 raise
 
 
-    def generate_answers(self, query_texts: List[str], documents: List[List[str] | str]) -> List[str]:
+    def generate_answers(self, query_texts: list[str], documents: list[list[str] | str]) -> list[str]:
         if not self.model or not self.tokenizer:
             raise RuntimeError("Model and tokenizer must be loaded before generating answers.")
         
@@ -375,4 +374,3 @@ class HuggingFaceCausalLM(HuggingFaceModelWrapper):
 class HuggingFaceSeq2SeqLM(HuggingFaceModelWrapper):
     def __init__(self, model_name_or_path: str, **kwargs):
         super().__init__(model_name_or_path, **kwargs)
-
